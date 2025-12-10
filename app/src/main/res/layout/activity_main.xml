@@ -15,7 +15,7 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:title="Panel de Control v2"
+            app:title="Configuraciones"
             app:titleTextColor="?attr/colorOnPrimary"
             android:background="?attr/colorPrimary" />
 
