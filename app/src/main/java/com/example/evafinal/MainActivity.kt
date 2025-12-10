@@ -1,6 +1,7 @@
 package com.example.evafinal
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
@@ -22,8 +23,11 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.switchmaterial.SwitchMaterial
+import java.text.DecimalFormat
 
 class MainActivity : AppCompatActivity(), SensorEventListener {
 
@@ -34,6 +38,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var bluetoothStatusText: TextView
     private lateinit var wifiStatusText: TextView
     private lateinit var locationStatusText: TextView
+    private lateinit var coordinatesText: TextView
     private lateinit var pitchText: TextView
     private lateinit var rollText: TextView
     private lateinit var azimuthText: TextView
@@ -43,6 +48,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var wifiManager: WifiManager
     private lateinit var locationManager: LocationManager
     private lateinit var sensorManager: SensorManager
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
 
     // Valores de los sensores
     private val accelerometerReading = FloatArray(3)
@@ -59,12 +65,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         updateSwitchStates()
     }
 
+    private val requestLocationPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ ->
+        // Cuando el usuario responde al permiso, actualizamos el estado
+        updateSwitchStates()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         setupViews()
         setupManagers()
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
     }
 
     override fun onResume() {
@@ -109,6 +121,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         bluetoothStatusText = findViewById(R.id.bluetooth_status_text)
         wifiStatusText = findViewById(R.id.wifi_status_text)
         locationStatusText = findViewById(R.id.location_status_text)
+        coordinatesText = findViewById(R.id.coordinates_text)
 
         pitchText = findViewById(R.id.pitch_text)
         rollText = findViewById(R.id.roll_text)
@@ -139,6 +152,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         locationSwitch.isChecked = isLocationEnabled
         locationStatusText.text = if (isLocationEnabled) "Activada" else "Desactivada"
 
+        // Actualizar coordenadas
+        if (isLocationEnabled) {
+            fetchCoordinates()
+        } else {
+            coordinatesText.text = ""
+        }
+
         setupListeners()
     }
 
@@ -155,8 +175,38 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
         }
 
-        locationSwitch.setOnCheckedChangeListener { _, _ ->
-            startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+        locationSwitch.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                // Si el usuario enciende el switch, verificamos el permiso
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    requestLocationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                } else {
+                    // Si el permiso ya está, pero la ubicación está desactivada, abrimos ajustes
+                    if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                        startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                    }
+                }
+            } else {
+                // Si apaga el switch, siempre vamos a ajustes
+                startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission") // La permiso se verifica antes de llamar
+    private fun fetchCoordinates() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                if (location != null) {
+                    val lat = String.format("%.4f", location.latitude)
+                    val lon = String.format("%.4f", location.longitude)
+                    coordinatesText.text = "Lat: $lat, Lon: $lon"
+                } else {
+                    coordinatesText.text = "Buscando..."
+                }
+            }
+        } else {
+            coordinatesText.text = "Permiso denegado"
         }
     }
 
@@ -171,9 +221,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         updateOrientationAngles()
     }
 
-    override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {
-        // No es necesario para este caso
-    }
+    override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) { /* No es necesario */ }
 
     private fun updateOrientationAngles() {
         SensorManager.getRotationMatrix(rotationMatrix, null, accelerometerReading, magnetometerReading)

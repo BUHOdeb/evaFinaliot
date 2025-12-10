@@ -138,6 +138,13 @@
                 android:layout_height="wrap_content"
                 tools:text="Activada"
                 android:textAppearance="?attr/textAppearanceListItemSecondary" />
+
+            <TextView
+                android:id="@+id/coordinates_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="Lat: 0.0, Lon: 0.0"
+                android:textAppearance="?attr/textAppearanceListItemSecondary" />
         </LinearLayout>
 
         <com.google.android.material.switchmaterial.SwitchMaterial
